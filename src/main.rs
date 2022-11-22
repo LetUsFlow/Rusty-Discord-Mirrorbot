@@ -1,11 +1,11 @@
 use std::env;
+use std::iter::zip;
 
 use dotenvy::dotenv;
 
 use serenity::async_trait;
 use serenity::http::Http;
-use serenity::client::Context;
-use serenity::model::channel::Message;
+use serenity::model::channel::{AttachmentType, Message};
 use serenity::model::prelude::Ready;
 use serenity::model::webhook::Webhook;
 use serenity::prelude::*;
@@ -15,29 +15,42 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-
-        if msg.webhook_id.is_some() {
+        if msg.webhook_id.is_some() || (msg.content.is_empty() && msg.attachments.is_empty()) {
             return;
         }
 
-        let uri;
-        if msg.channel_id.to_string() == env::var("CHANNEL_ONE_ID").unwrap() {
-            uri = env::var("CHANNEL_TWO_HOOK").unwrap();
-        } else if msg.channel_id.to_string() == env::var("CHANNEL_TWO_ID").unwrap() {
-            uri = env::var("CHANNEL_ONE_HOOK").unwrap();
+        let uri = if msg.channel_id.to_string() == env::var("CHANNEL_ONE_ID").expect("Expected CHANNEL_ONE_ID in the environment") {
+            env::var("CHANNEL_TWO_HOOK").expect("Expected CHANNEL_TWO_HOOK in the environment")
+        } else if msg.channel_id.to_string() == env::var("CHANNEL_TWO_ID").expect("Expected CHANNEL_TWO_ID in the environment") {
+            env::var("CHANNEL_ONE_HOOK").expect("Expected CHANNEL_ONE_HOOK in the environment")
         } else {
             return;
-        }
+        };
 
         let http = Http::new("");
-        let webhook = Webhook::from_url(&http, &*uri).await.expect("Replace the webhook with your own");
+        let webhook = Webhook::from_url(&http, &uri).await.expect("Replace the webhook with your own");
+
+        let mut files = Vec::new();
+        let mut filenames = Vec::new();
+        for attachment in &msg.attachments {
+            files.push(attachment.download().await.unwrap());
+            filenames.push(&attachment.filename);
+        }
 
         webhook
-            .execute(&http, false, |w|
+            .execute(&http, false, |w| {
                 w.content(msg.content_safe(&ctx))
                     .username(&msg.author.name)
-                    .avatar_url(&msg.author.avatar_url().unwrap_or("".to_string()))
-            )
+                    .avatar_url(&msg.author.avatar_url().unwrap_or_default());
+                for (file, filename) in zip(files, filenames) {
+                    w.add_file(AttachmentType::Bytes {
+                        data: std::borrow::Cow::from(file),
+                        filename: filename.to_string()
+                    });
+                }
+
+                w
+            })
             .await
             .expect("Could not execute webhook.");
     }
