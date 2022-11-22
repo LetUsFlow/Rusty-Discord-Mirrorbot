@@ -42,6 +42,7 @@ impl EventHandler for Handler {
                 w.content(msg.content_safe(&ctx))
                     .username(&msg.author.name)
                     .avatar_url(&msg.author.avatar_url().unwrap_or_default());
+
                 for (file, filename) in zip(files, filenames) {
                     w.add_file(AttachmentType::Bytes {
                         data: std::borrow::Cow::from(file),
