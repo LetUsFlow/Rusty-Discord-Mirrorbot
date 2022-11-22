@@ -1,5 +1,6 @@
 use std::env;
 use std::iter::zip;
+use std::borrow::Cow;
 
 use dotenvy::dotenv;
 
@@ -34,7 +35,7 @@ impl EventHandler for Handler {
         let mut filenames = Vec::new();
         for attachment in &msg.attachments {
             files.push(attachment.download().await.unwrap());
-            filenames.push(&attachment.filename);
+            filenames.push(attachment.filename.to_string());
         }
 
         webhook
@@ -45,8 +46,8 @@ impl EventHandler for Handler {
 
                 for (file, filename) in zip(files, filenames) {
                     w.add_file(AttachmentType::Bytes {
-                        data: std::borrow::Cow::from(file),
-                        filename: filename.to_string()
+                        data: Cow::from(file),
+                        filename
                     });
                 }
 
@@ -66,10 +67,8 @@ async fn main() {
     dotenv().ok();
     let token = env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN in the environment");
 
-    let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
-
     let mut client =
-        Client::builder(&token, intents).event_handler(Handler).await.expect("Err creating client");
+        Client::builder(&token, GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT).event_handler(Handler).await.expect("Err creating client");
 
     if let Err(why) = client.start().await {
         println!("Client error: {:?}", why);
