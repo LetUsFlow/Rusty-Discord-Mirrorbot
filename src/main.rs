@@ -23,7 +23,9 @@ struct Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        if msg.webhook_id.is_some() || (msg.content.is_empty() && msg.attachments.is_empty() && msg.embeds.is_empty()) {
+        // Only ignore messages from the bots own webhooks
+        if msg.webhook_id.unwrap_or_default() == self.wh_one.as_ref().unwrap().id ||
+            msg.webhook_id.unwrap_or_default() == self.wh_two.as_ref().unwrap().id {
             return;
         }
 
