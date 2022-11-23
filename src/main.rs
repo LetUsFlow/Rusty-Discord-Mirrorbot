@@ -6,6 +6,7 @@ use dotenvy::dotenv;
 
 use serenity::async_trait;
 use serenity::http::Http;
+use serenity::json::json;
 use serenity::model::channel::{AttachmentType, Message};
 use serenity::model::prelude::Ready;
 use serenity::model::webhook::Webhook;
@@ -22,7 +23,7 @@ struct Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        if msg.webhook_id.is_some() || (msg.content.is_empty() && msg.attachments.is_empty()) {
+        if msg.webhook_id.is_some() || (msg.content.is_empty() && msg.attachments.is_empty() && msg.embeds.is_empty()) {
             return;
         }
 
@@ -54,6 +55,10 @@ impl EventHandler for Handler {
                         data: Cow::from(file),
                         filename,
                     });
+                }
+
+                if !msg.embeds.is_empty() {
+                    w.embeds(msg.embeds.iter().map(|e| json!(e)).collect());
                 }
 
                 w
