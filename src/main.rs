@@ -1,6 +1,7 @@
 use std::env;
 use std::iter::zip;
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use dotenvy::dotenv;
 
@@ -13,9 +14,9 @@ use serenity::model::webhook::Webhook;
 use serenity::prelude::*;
 
 struct Handler {
-    http: Http,
-    wh_one: Option<Webhook>,
-    wh_two: Option<Webhook>,
+    http: Arc<Http>,
+    wh_one: Webhook,
+    wh_two: Webhook,
     id_one: String,
     id_two: String,
 }
@@ -24,8 +25,8 @@ struct Handler {
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         // Only ignore messages from the bots own webhooks
-        if msg.webhook_id.unwrap_or_default() == self.wh_one.as_ref().unwrap().id ||
-            msg.webhook_id.unwrap_or_default() == self.wh_two.as_ref().unwrap().id {
+        if msg.webhook_id.unwrap_or_default() == self.wh_one.id ||
+            msg.webhook_id.unwrap_or_default() == self.wh_two.id {
             return;
         }
 
@@ -46,7 +47,7 @@ impl EventHandler for Handler {
             filenames.push(attachment.filename.to_string());
         }
 
-        webhook.as_ref().unwrap()
+        webhook
             .execute(&self.http, false, |w| {
                 w.content(msg.content_safe(&ctx))
                     .username(&msg.author.name)
@@ -79,17 +80,17 @@ async fn main() {
     dotenv().ok();
     let token = env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN in the environment");
 
-    let mut handler = Handler {
-        http: Http::new(""),
-        wh_one: None,
-        wh_two: None,
+    let http = Arc::new(Http::new(""));
+
+    let handler = Handler {
+        http: http.clone(),
+        wh_one: Webhook::from_url(&http, &env::var("CHANNEL_ONE_HOOK").expect("Expected CHANNEL_ONE_HOOK in the environment"))
+            .await.expect("Creating CHANNEL_ONE_HOOK failed"),
+        wh_two: Webhook::from_url(&http, &env::var("CHANNEL_TWO_HOOK").expect("Expected CHANNEL_TWO_HOOK in the environment"))
+            .await.expect("Creating CHANNEL_TWO_HOOK failed"),
         id_one: env::var("CHANNEL_ONE_ID").expect("Expected CHANNEL_ONE_ID in the environment"),
         id_two: env::var("CHANNEL_TWO_ID").expect("Expected CHANNEL_TWO_ID in the environment"),
     };
-    handler.wh_one = Some(Webhook::from_url(&handler.http, &env::var("CHANNEL_ONE_HOOK").expect("Expected CHANNEL_ONE_HOOK in the environment"))
-        .await.expect("Creating CHANNEL_ONE_HOOK failed"));
-    handler.wh_two = Some(Webhook::from_url(&handler.http, &env::var("CHANNEL_TWO_HOOK").expect("Expected CHANNEL_TWO_HOOK in the environment"))
-        .await.expect("Creating CHANNEL_TWO_HOOK failed"));
 
     let mut client =
         Client::builder(&token, GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT).event_handler(handler).await.expect("Err creating client");
