@@ -1,6 +1,6 @@
+use std::borrow::Cow;
 use std::env;
 use std::iter::zip;
-use std::borrow::Cow;
 use std::sync::Arc;
 
 use dotenvy::dotenv;
@@ -25,8 +25,9 @@ struct Handler {
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         // Only ignore messages from the bots own webhooks
-        if msg.webhook_id.unwrap_or_default() == self.wh_one.id ||
-            msg.webhook_id.unwrap_or_default() == self.wh_two.id {
+        if msg.webhook_id.unwrap_or_default() == self.wh_one.id
+            || msg.webhook_id.unwrap_or_default() == self.wh_two.id
+        {
             return;
         }
 
@@ -84,16 +85,29 @@ async fn main() {
 
     let handler = Handler {
         http: http.clone(),
-        wh_one: Webhook::from_url(&http, &env::var("CHANNEL_ONE_HOOK").expect("Expected CHANNEL_ONE_HOOK in the environment"))
-            .await.expect("Creating CHANNEL_ONE_HOOK failed"),
-        wh_two: Webhook::from_url(&http, &env::var("CHANNEL_TWO_HOOK").expect("Expected CHANNEL_TWO_HOOK in the environment"))
-            .await.expect("Creating CHANNEL_TWO_HOOK failed"),
+        wh_one: Webhook::from_url(
+            &http,
+            &env::var("CHANNEL_ONE_HOOK").expect("Expected CHANNEL_ONE_HOOK in the environment"),
+        )
+        .await
+        .expect("Creating CHANNEL_ONE_HOOK failed"),
+        wh_two: Webhook::from_url(
+            &http,
+            &env::var("CHANNEL_TWO_HOOK").expect("Expected CHANNEL_TWO_HOOK in the environment"),
+        )
+        .await
+        .expect("Creating CHANNEL_TWO_HOOK failed"),
         id_one: env::var("CHANNEL_ONE_ID").expect("Expected CHANNEL_ONE_ID in the environment"),
         id_two: env::var("CHANNEL_TWO_ID").expect("Expected CHANNEL_TWO_ID in the environment"),
     };
 
-    let mut client =
-        Client::builder(&token, GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT).event_handler(handler).await.expect("Err creating client");
+    let mut client = Client::builder(
+        &token,
+        GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT,
+    )
+    .event_handler(handler)
+    .await
+    .expect("Err creating client");
 
     if let Err(why) = client.start().await {
         println!("Client error: {:?}", why);
