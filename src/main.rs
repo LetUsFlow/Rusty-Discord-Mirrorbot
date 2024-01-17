@@ -1,17 +1,17 @@
 use std::borrow::Cow;
 use std::env;
-use std::iter::zip;
 use std::sync::Arc;
 
 use dotenvy::dotenv;
 
 use serenity::async_trait;
+use serenity::builder::{CreateAttachment, CreateEmbed, ExecuteWebhook};
 use serenity::http::Http;
-use serenity::json::json;
-use serenity::model::channel::{AttachmentType, Message};
+use serenity::model::channel::Message;
 use serenity::model::prelude::Ready;
 use serenity::model::webhook::Webhook;
 use serenity::prelude::*;
+use tokio::runtime::Handle;
 
 struct Handler {
     http: Arc<Http>,
@@ -42,31 +42,36 @@ impl EventHandler for Handler {
 
         // Extract attachments
         let mut files = Vec::new();
-        let mut filenames = Vec::new();
         for attachment in &msg.attachments {
-            files.push(attachment.download().await.unwrap());
-            filenames.push(attachment.filename.to_string());
+            files.push((
+                attachment.download().await.unwrap_or_default(),
+                attachment.filename.to_string(),
+            ));
         }
 
+        let w = ExecuteWebhook::new()
+            .content(msg.content_safe(&ctx))
+            .username(&msg.author.name)
+            .avatar_url(&msg.author.avatar_url().unwrap_or_default())
+            .add_files(msg.attachments.iter().map(|attachment| {
+                CreateAttachment::bytes(
+                    Cow::from(
+                        Handle::current()
+                            .block_on(async { attachment.download().await })
+                            .unwrap_or_default(),
+                    ),
+                    attachment.filename.to_string(),
+                )
+            }))
+            .embeds(
+                msg.embeds
+                    .iter()
+                    .map(|e| CreateEmbed::from(e.clone()))
+                    .collect(),
+            );
+
         webhook
-            .execute(&self.http, false, |w| {
-                w.content(msg.content_safe(&ctx))
-                    .username(&msg.author.name)
-                    .avatar_url(&msg.author.avatar_url().unwrap_or_default());
-
-                for (file, filename) in zip(files, filenames) {
-                    w.add_file(AttachmentType::Bytes {
-                        data: Cow::from(file),
-                        filename,
-                    });
-                }
-
-                if !msg.embeds.is_empty() {
-                    w.embeds(msg.embeds.iter().map(|e| json!(e)).collect());
-                }
-
-                w
-            })
+            .execute(&self.http, false, w)
             .await
             .expect("Could not execute webhook");
     }
