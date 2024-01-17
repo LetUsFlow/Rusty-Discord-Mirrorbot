@@ -54,7 +54,7 @@ impl EventHandler for Handler {
             .embeds(
                 msg.embeds
                     .iter()
-                    .filter(|e| e.kind.is_none())
+                    .filter(|e| e.kind == Some("rich".to_string()))
                     .map(|e| CreateEmbed::from(e.clone()))
                     .collect(),
             );
