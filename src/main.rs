@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::env;
 use std::sync::Arc;
 
@@ -11,7 +10,6 @@ use serenity::model::channel::Message;
 use serenity::model::prelude::Ready;
 use serenity::model::webhook::Webhook;
 use serenity::prelude::*;
-use tokio::runtime::Handle;
 
 struct Handler {
     http: Arc<Http>,
@@ -40,12 +38,11 @@ impl EventHandler for Handler {
             return;
         };
 
-        // Extract attachments
-        let mut files = Vec::new();
-        for attachment in &msg.attachments {
-            files.push((
-                attachment.download().await.unwrap_or_default(),
-                attachment.filename.to_string(),
+        let mut attachments = Vec::new();
+        for file in &msg.attachments {
+            attachments.push(CreateAttachment::bytes(
+                file.download().await.unwrap(),
+                file.filename.to_string(),
             ));
         }
 
@@ -53,19 +50,11 @@ impl EventHandler for Handler {
             .content(msg.content_safe(&ctx))
             .username(&msg.author.name)
             .avatar_url(&msg.author.avatar_url().unwrap_or_default())
-            .add_files(msg.attachments.iter().map(|attachment| {
-                CreateAttachment::bytes(
-                    Cow::from(
-                        Handle::current()
-                            .block_on(async { attachment.download().await })
-                            .unwrap_or_default(),
-                    ),
-                    attachment.filename.to_string(),
-                )
-            }))
+            .add_files(attachments)
             .embeds(
                 msg.embeds
                     .iter()
+                    .filter(|e| e.kind.is_none())
                     .map(|e| CreateEmbed::from(e.clone()))
                     .collect(),
             );
