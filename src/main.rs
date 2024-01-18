@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use dotenvy::dotenv;
 
+use serenity::all::ChannelId;
 use serenity::async_trait;
 use serenity::builder::{CreateAttachment, CreateEmbed, ExecuteWebhook};
 use serenity::http::Http;
@@ -15,8 +16,8 @@ struct Handler {
     http: Arc<Http>,
     wh_one: Webhook,
     wh_two: Webhook,
-    id_one: String,
-    id_two: String,
+    id_one: ChannelId,
+    id_two: ChannelId,
 }
 
 #[async_trait]
@@ -30,9 +31,9 @@ impl EventHandler for Handler {
         }
 
         // Pick correct webhook
-        let webhook = if msg.channel_id.to_string() == self.id_one {
+        let webhook = if msg.channel_id == self.id_one {
             &self.wh_two
-        } else if msg.channel_id.to_string() == self.id_two {
+        } else if msg.channel_id == self.id_two {
             &self.wh_one
         } else {
             return;
@@ -91,8 +92,18 @@ async fn main() {
         )
         .await
         .expect("Creating CHANNEL_TWO_HOOK failed"),
-        id_one: env::var("CHANNEL_ONE_ID").expect("Expected CHANNEL_ONE_ID in the environment"),
-        id_two: env::var("CHANNEL_TWO_ID").expect("Expected CHANNEL_TWO_ID in the environment"),
+        id_one: ChannelId::new(
+            env::var("CHANNEL_ONE_ID")
+                .expect("Expected CHANNEL_ONE_ID in the environment")
+                .parse()
+                .expect("Failed to parse CHANNEL_ONE_ID"),
+        ),
+        id_two: ChannelId::new(
+            env::var("CHANNEL_TWO_ID")
+                .expect("Expected CHANNEL_TWO_ID in the environment")
+                .parse()
+                .expect("Failed to parse CHANNEL_TWO_ID"),
+        ),
     };
 
     let mut client = Client::builder(
